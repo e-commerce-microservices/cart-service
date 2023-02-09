@@ -74,3 +74,9 @@ func (srv cartService) DeleteCart(ctx context.Context, req *pb.DeleteCartRequest
 		Message: "Xóa sản phẩm thành công khỏi giỏ hàng",
 	}, nil
 }
+
+func (srv cartService) Ping(context.Context, *empty.Empty) (*pb.Pong, error) {
+	return &pb.Pong{
+		Message: "pong",
+	}, nil
+}
