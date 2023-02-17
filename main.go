@@ -43,11 +43,19 @@ func main() {
 		log.Fatal("can't dial auth service", err)
 	}
 	authClient := pb.NewAuthServiceClient(authConn)
+
+	productConn, err := grpc.Dial("product-service:8080", grpc.WithInsecure())
+	if err != nil {
+		log.Fatal("can't dial auth service", err)
+	}
+	productClient := pb.NewProductServiceClient(productConn)
+
 	// init queries
 	queries := repository.New(cartDB)
 	cartService := cartService{
-		authClient: authClient,
-		queries:    queries,
+		authClient:    authClient,
+		productClient: productClient,
+		queries:       queries,
 	}
 	pb.RegisterCartServiceServer(grpcServer, cartService)
 

@@ -11,19 +11,20 @@ import (
 
 const createCart = `-- name: CreateCart :exec
 INSERT INTO "cart" (
-    "customer_id", "product_id"
+    "customer_id", "product_id", "quantity"
 ) VALUES (
-    $1, $2
+    $1, $2, $3
 )
 `
 
 type CreateCartParams struct {
 	CustomerID int64
 	ProductID  int64
+	Quantity   int32
 }
 
 func (q *Queries) CreateCart(ctx context.Context, arg CreateCartParams) error {
-	_, err := q.db.ExecContext(ctx, createCart, arg.CustomerID, arg.ProductID)
+	_, err := q.db.ExecContext(ctx, createCart, arg.CustomerID, arg.ProductID, arg.Quantity)
 	return err
 }
 
@@ -40,4 +41,37 @@ type DeleteCartParams struct {
 func (q *Queries) DeleteCart(ctx context.Context, arg DeleteCartParams) error {
 	_, err := q.db.ExecContext(ctx, deleteCart, arg.ID, arg.CustomerID)
 	return err
+}
+
+const getCart = `-- name: GetCart :many
+SELECT id, customer_id, product_id, quantity FROM "cart"
+WHERE "customer_id" = $1
+`
+
+func (q *Queries) GetCart(ctx context.Context, customerID int64) ([]Cart, error) {
+	rows, err := q.db.QueryContext(ctx, getCart, customerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Cart
+	for rows.Next() {
+		var i Cart
+		if err := rows.Scan(
+			&i.ID,
+			&i.CustomerID,
+			&i.ProductID,
+			&i.Quantity,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
