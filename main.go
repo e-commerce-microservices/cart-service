@@ -10,6 +10,12 @@ import (
 	"github.com/e-commerce-microservices/cart-service/pb"
 	"github.com/e-commerce-microservices/cart-service/repository"
 	"github.com/joho/godotenv"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	"google.golang.org/grpc"
 
 	// postgres driver
@@ -21,6 +27,12 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// tp, tpErr := jaegerTraceProvider()
+	// if tpErr != nil {
+	// 	log.Fatal(tpErr)
+	// }
+	// otel.SetTracerProvider(tp)
+	// otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 }
 func main() {
 	// init user db connection
@@ -36,7 +48,7 @@ func main() {
 	if err := cartDB.Ping(); err != nil {
 		log.Fatal("can't ping to user db", err)
 	}
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(otelgrpc.UnaryServerInterceptor()))
 
 	authConn, err := grpc.Dial("auth-service:8080", grpc.WithInsecure())
 	if err != nil {
@@ -69,4 +81,26 @@ func main() {
 		log.Fatal("cannot create grpc server: ", err)
 	}
 
+}
+func jaegerTraceProvider() (*sdktrace.TracerProvider, error) {
+
+	// exp, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint("http://jaeger-all-in-one:14268/api/traces")))
+	// exp, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint("http://jaeger-all-in-one:14268/api/traces")))
+	exp, err := jaeger.New(jaeger.WithAgentEndpoint(jaeger.WithAgentHost("10.3.68.12")))
+
+	if err != nil {
+		log.Println("err: ", err)
+		return nil, err
+	}
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exp),
+		sdktrace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String("cart service"),
+			attribute.String("environment", "development"),
+		)),
+		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(1.0)),
+	)
+
+	return tp, nil
 }
